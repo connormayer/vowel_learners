@@ -1,11 +1,7 @@
-import matplotlib.pyplot as plt
 import torch
-
-from input_sampler import sample_inputs
 from math import log
-from pprint import pprint
-from torch.distributions import Categorical
 
+# Avoid floating point errors to the extent we can
 torch.set_default_dtype(torch.float64)
 # For debugging
 # import random
@@ -53,6 +49,9 @@ def add_values(x, token_idx, cat, phonemes, params, data_ss=0, n=1):
     mu += scaled_x
     phonemes['cat_nus'][cat] += n
 
+    # Force matrix to be symmetrical
+    cov = make_symmetric(cov)
+
 def subtract_values(x, token_idx, cat, phonemes, data_ss=0, n=1):
     """
     Updates the parameters of a phoneme category after a token is removed 
@@ -72,6 +71,17 @@ def subtract_values(x, token_idx, cat, phonemes, data_ss=0, n=1):
     cov -= data_ss
     cov -= (nu * n) / (nu + n) * mu_diff * mu_diff[:, None]
 
+    # Force matrix to be symmetrical
+    cov = make_symmetric(cov)
+
+def make_symmetric(mat):
+    # Weirdly this is way faster than using torch methods like triu or tril
+    if not (mat.T == mat).all():
+        for row in range(len(mat)):
+            for col in range(row + 1, len(mat)):
+                mat[row][col] = mat[col][row]
+    return mat
+
 def add_token(z, x, token_idx, anneal, phonemes, params):
     """
     Samples a new phoneme category and adds a token to it
@@ -88,7 +98,7 @@ def add_token(z, x, token_idx, anneal, phonemes, params):
 
     # Sample a category based on probability
     post = torch.exp(log_unnorm_post - log_unnorm_post.logsumexp(-1, keepdim=True))
-    new_cat = Categorical(post).sample()
+    new_cat = torch.distributions.Categorical(post).sample()
 
     # Create a new category if necessary
     if new_cat > phonemes['max_cat']:
@@ -152,23 +162,12 @@ def get_likelihood(x, token_idx, phonemes, params, data_ss=0, n=1):
     t1 = (n + t1) / 2
 
     p += sum(torch.lgamma(t1) - torch.lgamma(t2))
-
     p += (nus / 2) * torch.logdet(covs)
     p -= (dims * n / 2) * log(torch.pi)
     p -= (dims / 2) * torch.log((nus + n) / nus)
     p -= ((nus + n) / 2) * torch.logdet(S_c)
 
     return p
-
-def get_log_det(t):
-    """
-    This is a implementation of logdet that is a bit more efficient 
-    than the torch.logdet function, but assumes matrices are
-    symmetrical.
-    """
-    cholesky = torch.linalg.cholesky(t)
-    diags = torch.diagonal(cholesky, dim1=-2, dim2=-1)
-    return torch.sum(torch.log(diags), 1) * 2
 
 def get_joint_probability(x, z, phonemes, params):
     """
@@ -250,6 +249,7 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
     print("Initializing parameters")
     z = torch.zeros([x.shape[0]]) - 1
     anneal = get_annealing_factor(0, params)
+    log_likelihoods = []
 
     phonemes = {
         'cat_mus': [],
@@ -274,132 +274,30 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
 
         resample_z(z, x, anneal, phonemes, params)
 
-        # if b % print_every == 0:
-        #     ll = get_joint_probability(x, z, phonemes, params)
-        #     print(ll)
-        #     pprint(phonemes)
+        if b % print_every == 0:
+            ll = get_joint_probability(x, z, phonemes, params)
+            log_likelihoods.append((b, ll.item()))
+            print("Log likelihood: {}".format(ll))
+            print("Num cats: {}".format(phonemes['max_cat'] + 1))
 
-    return z, phonemes
+    return z, phonemes, log_likelihoods
 
-########################
-# Data generation code #
-########################
+#######
+# RUN #
+#######
 
-def generate_data(params, pi, mu, sigma):
-    """
-    Given category probabilities, means, and variances, samples a number of
-    acoustic vowel tokens. This can be used to generate input for the 
-    simulation.
-    """
-    z = torch.distributions.Categorical(pi).sample((N,)) + 1
-    x = torch.distributions.Normal(mu[z - 1], sigma).sample()
-    return z, x
-
-######################
-# Visualization code #
-######################
-
-def plot_data(z, x):
-    """
-    Creates a simple scatterplot of the datapoints and their category assignments
-    """
-    return plt.scatter(*x.T, c=z)
-
-def plot_means(mu):
-    """
-    Creates a scatter plot of the category means
-    """
-    K = mu.shape[0]
-    return plt.scatter(*mu.T, c=torch.arange(K))
-
-if __name__ == "__main__":
-    # A dictionary to hold the simulation parameters
-    params = {
-        #########################################
-        # PARAMS RELATED TO SAMPLING INPUT DATA #
-        #########################################
-        # Number of word_samples
-        'N': 5000,
-
-        # Files for sampling input data
-        'vowel_file': 'corpus_data/hillenbrand_vowel_acoustics.csv',
-        'word_file': 'corpus_data/childes_counts_prons.csv',
-
-        # Means to use for in prior for each acoustic variable
-        'prior_means': {
-            'f1': 500,
-            'f2': 1500,
-            'duration': 275,
-            'f0': 200,
-            'f1-20-50': 0,
-            'f2-20-50': 0,
-            'f1-50-80': -20,
-            'f2-50-80': 80,
-            'f3': 2800,
-            'f3-20-50': -10,
-            'f3-50-80': -20,
-            'f4': 4000
-        },
-
-        # Acoustic variables to use in simulation
-        'dimensions': [
-            # 'f0',
-            'f1',
-            'f2',
-            # 'f3',
-            # 'f4',
-            # 'duration',
-            # 'f1-20-50',
-            # 'f2-20-50',
-            # 'f3-20-50',
-            # 'f3-50-80',
-            # 'f1-50-80',
-            # 'f2-50-80'
-        ],
-
-        # Alpha for dirichlet process
-        'alpha': 10,
-
-        # Annealing factor
-        'annealing_factor': 9,
-
-        # Default parameters for category distributions
-        #'mu_0': torch.tensor([500., 1500.]),
-        'S_0': torch.eye(2),
-        'nu_0': 1.001
-    }
-
-    # Set mu_0 to contain only dimensions we're using
+def run(vowel_samples, params):
+    # Set parameters for prior distributions based on dimensionality
     params['mu_0'] = torch.Tensor([
         params['prior_means'][dim] for dim in params['dimensions']
     ])
+    params['S_0'] = torch.eye(len(params['dimensions']))
+    params['nu_0'] = len(params['dimensions']) - 1 + 0.001
 
-    words, vowel_samples, vowel_labels = sample_inputs(
-        params['vowel_file'], params['word_file'], params['dimensions']
+    # Do Gibbs sampling
+    learned_z, cats, log_likelihoods = gibbs_sample(
+        vowel_samples, params, print_every = params['print_every'], 
+        num_samples=params['num_samples']
     )
 
-    learned_z, cats = gibbs_sample(
-        torch.stack(vowel_samples), params, print_every=1000, num_samples=10000
-    )
-    # TODO WRITE OUTPUT
-    print(cats)
-
-
-# # Generate data
-# # The probability of observing each category
-# true_pi = torch.Tensor([0.33, 0.33, 0.34])
-
-# # The means of each category
-# true_mu = torch.Tensor([
-#         [300, 2500],
-#         [1000, 1000],
-#         [300, 700]
-#     ])
-
-# # The standard deviation of each category
-# true_sigma = 100
-# true_z, data_x = generate_data(params, true_pi, true_mu, true_sigma)
-# # data_x = torch.Tensor([
-# #     [400, 1600],
-# #     [600, 1400]
-# # ])
+    return learned_z, cats, log_likelihoods
