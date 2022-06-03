@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from math import log
 
@@ -166,7 +167,6 @@ def get_likelihood(x, token_idx, phonemes, params, data_ss=0, n=1):
     p -= (dims * n / 2) * log(torch.pi)
     p -= (dims / 2) * torch.log((nus + n) / nus)
     p -= ((nus + n) / 2) * torch.logdet(S_c)
-
     return p
 
 def get_joint_probability(x, z, phonemes, params):
@@ -263,6 +263,7 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
     params['dims_tensor'] = torch.arange(x.shape[1])[:, None]
 
     # First pass to initialize token categories
+
     for token_idx in range(len(z)):
         add_token(z, x, token_idx, anneal, phonemes, params)
 

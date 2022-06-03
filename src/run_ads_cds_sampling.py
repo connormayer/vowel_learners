@@ -53,25 +53,39 @@ if __name__ == "__main__":
     parser.add_argument('counts_file', type=str)
     parser.add_argument('input_folder', type=str)
     parser.add_argument('output_folder', type=str)
+    parser.add_argument('num', type=int)
     parser.add_argument('dims', nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
     params = {
-        # Means to use for in prior for each acoustic variable
+        # Means to use in prior for each acoustic variable
         'prior_means': {
             'f1': 500,
             'f2': 1500,
             'duration': 275,
-            'f0': 200,
-            'f1-20-50': 0,
-            'f2-20-50': 0,
-            'f1-50-80': -20,
-            'f2-50-80': 80,
+            'df1_on': 0,
+            'df2_on': 0,
+            'df1_off': 0,
+            'df2_off': 0,
             'f3': 2500,
-            'f3-20-50': -10,
-            'f3-50-80': -20,
+            'df3_on': 0,
+            'df3_off': 0,
             'f4': 4000
         },
+        # In Barks
+        # 'prior_means': {
+        #     'f1': 4.9191869918699185,
+        #     'f2': 11.092832369942197,
+        #     'duration': 275,
+        #     'df1_on': -0.53,
+        #     'df2_on': -0.53,
+        #     'df1_off': -0.53,
+        #     'df2_off': -0.53,
+        #     'f3': 14.498026905829597,
+        #     'df3_on': -0.53,
+        #     'df3_off': -0.53,
+        #     'f4': 17.463288590604026
+        # },
 
         # Dimensions to use in simulation
         'dimensions': args.dims,
@@ -95,7 +109,8 @@ if __name__ == "__main__":
     cov_full_path = path.join(args.input_folder, args.cov_file)
     count_full_path = path.join(args.input_folder, args.counts_file)
     samples, labels = sample_inputs(
-        mu_full_path, cov_full_path, count_full_path, params['dimensions']
+        mu_full_path, cov_full_path, count_full_path, params['dimensions'],
+        num_samples=5000
     )
 
     learned_z, cats, lls = run(samples, params)
@@ -106,7 +121,7 @@ if __name__ == "__main__":
     output['vowel'] = labels
     output['learned_cat'] = learned_z.int()
     output.to_csv(
-        path.join(args.output_folder, '{}_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']))),
+        path.join(args.output_folder, '{}_{}_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)),
         index=False
     )
 
@@ -114,7 +129,7 @@ if __name__ == "__main__":
     cat_mus['vowel'] = cat_mus.index
     cat_mus.columns = params['dimensions'] + ['vowel']
     cat_mus.to_csv(
-        path.join(args.output_folder, '{}_{}_mus_{}.csv'.format(language, register, '_'.join(params['dimensions']))),
+        path.join(args.output_folder, '{}_{}_mus_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)),
         index=False
     )
 
@@ -124,13 +139,13 @@ if __name__ == "__main__":
     cov_colnames = ['-'.join([dim1, dim2]) for dim1 in params['dimensions'] for dim2 in params['dimensions']] + ['vowel']
     cat_covs.columns = cov_colnames
     cat_covs.to_csv(
-        path.join(args.output_folder, '{}_{}_covs_{}.csv'.format(language, register, '_'.join(params['dimensions']))), 
+        path.join(args.output_folder, '{}_{}_covs_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)), 
         index=False
     )
 
     lls = pd.DataFrame(lls)
     lls.columns = ['iteration', 'log_likelihood']
     lls.to_csv(
-        path.join(args.output_folder, '{}_{}_ll_{}.csv'.format(language, register, '_'.join(params['dimensions']))), 
+        path.join(args.output_folder, '{}_{}_ll_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)), 
         index=False
     )

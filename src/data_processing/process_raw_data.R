@@ -42,7 +42,7 @@ get_distribution <- function(dataset) {
 }
 
 setwd('C:/Users/conno/Dropbox/ling/vowel_learning_project/Code/vowel_learners/')
-file <- 'training_data/feldman_learner_inputs.csv'
+file <- 'training_data/feldman_learner_inputs_barks.csv'
 
 data <- read_csv(file)
 
@@ -52,9 +52,9 @@ sp <- data %>%
 en <- data %>%
   filter(language == 'en')
 
-# Combine speakers
-en <- en %>%
-  mutate(speaker = str_replace(speaker, "\\d\\d$", ""))
+# # Combine speakers
+# en <- en %>%
+#   mutate(speaker = str_replace(speaker, "\\d\\d$", ""))
 
 # ggplot(data=sp, aes(x=f2, y=f1, color=vowel)) + 
 #   geom_point(size=3) +
@@ -111,7 +111,7 @@ write_csv(result[[3]], 'training_data/distributions/spanish_test_ads_counts.csv'
 
 sp_cds <- sp_no_outliers %>%
   select(-contains("z_")) %>%
-  filter(register == 'ids')
+  filter(register == 'cds')
 
 write_csv(sp_cds, 'training_data/spanish_cds_no_outliers.csv')
 
@@ -178,7 +178,7 @@ write_csv(result[[2]], 'training_data/distributions/english_test_ads_cov.csv')
 write_csv(result[[3]], 'training_data/distributions/english_test_ads_counts.csv')
 
 en_cds <- en_no_outliers %>%
-  filter(register == 'ids')
+  filter(register == 'cds')
 
 # en_cds %>% group_by(speaker) %>% count()
 
