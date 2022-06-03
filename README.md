@@ -30,13 +30,17 @@ An example of how to run the learned on Spanish ADS speech in Hz on F1 and F2:
 ```python run_simulation spanish_train_ads_mu.csv spanish_train_ads_cov.csv spanish_train_ads_counts.csv ../training_data/distributions/hz ../model_outputs```
 
 Running the same model using Barks
+
 ```python run_simulation spanish_train_ads_mu.csv spanish_train_ads_cov.csv spanish_train_ads_counts.csv ../training_data/distributions ../model_outputs --barks```
 
 Running the same model using Barks
+
 ```python run_simulation spanish_train_ads_mu.csv spanish_train_ads_cov.csv spanish_train_ads_counts.csv ../training_data/distributions ../model_outputs --barks```
 
 Running the model using more dimensions 
+
 ```python run_simulation spanish_train_ads_mu.csv spanish_train_ads_cov.csv spanish_train_ads_counts.csv ../training_data/distributions ../model_outputs --barks --dims f1 f2 f3 duration```
 
 Running the model using more vowel samples
+
 ```python run_simulation spanish_train_ads_mu.csv spanish_train_ads_cov.csv spanish_train_ads_counts.csv ../training_data/distributions ../model_outputs --barks --vowel_samples 10000```
