@@ -172,7 +172,7 @@ if __name__ == "__main__":
     output.to_csv(
         path.join(
             args.output_folder, 
-            '{}_{}_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)
+            '{}_{}_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.suffix)
         ),
         index=False
     )
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     cat_mus.to_csv(
         path.join(
             args.output_folder, 
-            '{}_{}_mus_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)
+            '{}_{}_mus_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.suffix)
         ),
         index=False
     )
@@ -199,7 +199,7 @@ if __name__ == "__main__":
     cat_covs.to_csv(
         path.join(
             args.output_folder, 
-            '{}_{}_covs_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)
+            '{}_{}_covs_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.suffix)
         ), 
         index=False
     )
@@ -209,7 +209,7 @@ if __name__ == "__main__":
     lls.to_csv(
         path.join(
             args.output_folder, 
-            '{}_{}_ll_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)
+            '{}_{}_ll_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.suffix)
         ), 
         index=False
     )
