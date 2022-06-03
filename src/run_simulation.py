@@ -110,7 +110,7 @@ if __name__ == "__main__":
         'dimensions': args.dims,
 
         # Alpha for dirichlet process
-        'alpha': args.float,
+        'alpha': args.alpha,
 
         # Annealing factor
         'annealing_factor': args.annealing_factor,
