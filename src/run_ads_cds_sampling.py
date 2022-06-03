@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples=5000):
+def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples):
     mus = pd.read_csv(mu_file)
     covs = pd.read_csv(cov_file)
     counts = pd.read_csv(counts_file)
@@ -24,6 +24,7 @@ def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples=5000):
     dists = []
 
     for v in mus.vowel:
+        import pdb; pdb.set_trace()
         dists.append(
             torch.distributions.MultivariateNormal(
                 torch.Tensor(mus[mus.vowel == v].iloc[:, 1:].to_numpy()),
@@ -46,7 +47,6 @@ def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples=5000):
     return samples, labels
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument('mu_file', type=str)
     parser.add_argument('cov_file', type=str)
@@ -54,7 +54,9 @@ if __name__ == "__main__":
     parser.add_argument('input_folder', type=str)
     parser.add_argument('output_folder', type=str)
     parser.add_argument('num', type=int)
-    parser.add_argument('dims', nargs=argparse.REMAINDER)
+    parser.add_argument('--vowel_samples', default=5000, type=int)
+    parser.add_argument('--iterations', default=10000, type=int)
+    parser.add_argument('--dims', nargs=argparse.REMAINDER, default=['f1', 'f2'])
     args = parser.parse_args()
 
     params = {
@@ -98,7 +100,7 @@ if __name__ == "__main__":
 
         'print_every': 10,
 
-        'num_samples': 10000
+        'num_samples': args.iterations
     }
 
     file_bits = path.split(args.mu_file)[1].split('_')
@@ -110,7 +112,7 @@ if __name__ == "__main__":
     count_full_path = path.join(args.input_folder, args.counts_file)
     samples, labels = sample_inputs(
         mu_full_path, cov_full_path, count_full_path, params['dimensions'],
-        num_samples=5000
+        num_samples=args.vowel_samples
     )
 
     learned_z, cats, lls = run(samples, params)
@@ -121,7 +123,10 @@ if __name__ == "__main__":
     output['vowel'] = labels
     output['learned_cat'] = learned_z.int()
     output.to_csv(
-        path.join(args.output_folder, '{}_{}_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)),
+        path.join(
+            args.output_folder, 
+            '{}_{}_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)
+        ),
         index=False
     )
 
@@ -129,23 +134,35 @@ if __name__ == "__main__":
     cat_mus['vowel'] = cat_mus.index
     cat_mus.columns = params['dimensions'] + ['vowel']
     cat_mus.to_csv(
-        path.join(args.output_folder, '{}_{}_mus_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)),
+        path.join(
+            args.output_folder, 
+            '{}_{}_mus_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)
+        ),
         index=False
     )
 
     cat_covs = torch.stack(cats['cat_covs'])
     cat_covs = pd.DataFrame(cat_covs.reshape(cat_covs.shape[0], -1))
     cat_covs['vowel'] = cat_covs.index
-    cov_colnames = ['-'.join([dim1, dim2]) for dim1 in params['dimensions'] for dim2 in params['dimensions']] + ['vowel']
+    cov_colnames = [
+        '-'.join([dim1, dim2]) for dim1 in params['dimensions'] 
+        for dim2 in params['dimensions']
+    ] + ['vowel']
     cat_covs.columns = cov_colnames
     cat_covs.to_csv(
-        path.join(args.output_folder, '{}_{}_covs_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)), 
+        path.join(
+            args.output_folder, 
+            '{}_{}_covs_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)
+        ), 
         index=False
     )
 
     lls = pd.DataFrame(lls)
     lls.columns = ['iteration', 'log_likelihood']
     lls.to_csv(
-        path.join(args.output_folder, '{}_{}_ll_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)), 
+        path.join(
+            args.output_folder, 
+            '{}_{}_ll_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.num)
+        ), 
         index=False
     )
