@@ -1,13 +1,11 @@
 import numpy as np
-import torch
-from math import log
 
-# Avoid floating point errors to the extent we can
-torch.set_default_dtype(torch.float64)
+from scipy.special import gammaln, logsumexp
+
 # For debugging
-# import random
-# random.seed(0)
-# torch.manual_seed(0)
+import random
+random.seed(0)
+np.random.seed(0)
 
 #################
 # SAMPLING CODE #
@@ -28,8 +26,8 @@ def create_phoneme(phonemes, params):
     of the categories in four separate lists rather than having a single object
     per category because this format simplifies the vector calculations.
     """
-    phonemes['cat_mus'].append(params['mu_0'].clone())
-    phonemes['cat_covs'].append(params['S_0'].clone())
+    phonemes['cat_mus'].append(params['mu_0'].copy())
+    phonemes['cat_covs'].append(params['S_0'].copy())
     phonemes['cat_nus'].append(params['nu_0'])
     phonemes['cat_counts'].append(0)
 
@@ -45,7 +43,7 @@ def add_values(x, token_idx, cat, phonemes, params, data_ss=0, n=1):
     mu_diff = x[token_idx] - mu
 
     cov += ((nu * n) / (nu + n)) * mu_diff * mu_diff[:, None]
-    mu *= nu / (nu + n)
+    mu = mu * (nu / (nu + n))
     scaled_x = x[token_idx] * (n / (nu + n))
     mu += scaled_x
     phonemes['cat_nus'][cat] += n
@@ -65,8 +63,8 @@ def subtract_values(x, token_idx, cat, phonemes, data_ss=0, n=1):
     nu = phonemes['cat_nus'][cat]
     
     scaled_x = x[token_idx] * (n / (nu + n))
-    mu -= scaled_x
-    mu *= (nu + n) / nu
+    mu = mu - scaled_x
+    mu = mu * ((nu + n) / nu)
 
     mu_diff = x[token_idx] - mu
     cov -= data_ss
@@ -76,12 +74,7 @@ def subtract_values(x, token_idx, cat, phonemes, data_ss=0, n=1):
     cov = make_symmetric(cov)
 
 def make_symmetric(mat):
-    # Weirdly this is way faster than using torch methods like triu or tril
-    if not (mat.T == mat).all():
-        for row in range(len(mat)):
-            for col in range(row + 1, len(mat)):
-                mat[row][col] = mat[col][row]
-    return mat
+    return np.maximum(mat, mat.transpose())
 
 def add_token(z, x, token_idx, anneal, phonemes, params):
     """
@@ -94,12 +87,12 @@ def add_token(z, x, token_idx, anneal, phonemes, params):
 
     # Apply annealing
     if anneal > 0:
-        max_prob = torch.max(log_unnorm_post)
+        max_prob = np.max(log_unnorm_post)
         log_unnorm_post = anneal * (log_unnorm_post - max_prob)
 
     # Sample a category based on probability
-    post = torch.exp(log_unnorm_post - log_unnorm_post.logsumexp(-1, keepdim=True))
-    new_cat = torch.distributions.Categorical(post).sample()
+    post = np.exp(log_unnorm_post - logsumexp(log_unnorm_post))
+    new_cat = np.random.choice(len(post), p=post)
 
     # Create a new category if necessary
     if new_cat > phonemes['max_cat']:
@@ -138,8 +131,8 @@ def get_prior(phonemes, params):
     Calculates (something proportional to) the prior over existing categories
     and a new category
     """
-    pi = torch.Tensor(phonemes['cat_counts'] + [params['alpha']])
-    return torch.log(pi)
+    pi = np.array(phonemes['cat_counts'] + [params['alpha']])
+    return np.log(pi)
 
 def get_likelihood(x, token_idx, phonemes, params, data_ss=0, n=1):
     """
@@ -147,9 +140,9 @@ def get_likelihood(x, token_idx, phonemes, params, data_ss=0, n=1):
     or a new category given the existing category assignments
     """
     dims = x.shape[1]
-    mus = torch.stack(phonemes['cat_mus'] + [params['mu_0']])
-    covs = torch.stack(phonemes['cat_covs'] + [params['S_0']])
-    nus = torch.Tensor(phonemes['cat_nus'] + [params['nu_0']])
+    mus = np.stack(phonemes['cat_mus'] + [params['mu_0']])
+    covs = np.stack(phonemes['cat_covs'] + [params['S_0']])
+    nus = np.array(phonemes['cat_nus'] + [params['nu_0']])
 
     S_c = covs + data_ss
     mu_diff = x[token_idx] - mus
@@ -157,16 +150,16 @@ def get_likelihood(x, token_idx, phonemes, params, data_ss=0, n=1):
 
     p = 0
 
-    nus_tensor = nus.repeat(dims, 1)
+    nus_tensor = np.tile(nus, (dims, 1))
     t1 = (nus_tensor - params['dims_tensor'])
     t2 = t1 / 2
     t1 = (n + t1) / 2
 
-    p += sum(torch.lgamma(t1) - torch.lgamma(t2))
-    p += (nus / 2) * torch.logdet(covs)
-    p -= (dims * n / 2) * log(torch.pi)
-    p -= (dims / 2) * torch.log((nus + n) / nus)
-    p -= ((nus + n) / 2) * torch.logdet(S_c)
+    p += sum(gammaln(t1) - gammaln(t2))
+    p += (nus / 2) * np.linalg.slogdet(covs)[1]
+    p -= (dims * n / 2) * np.log(np.pi)
+    p -= (dims / 2) * np.log((nus + n) / nus)
+    p -= ((nus + n) / 2) * np.linalg.slogdet(S_c)[1]
     return p
 
 def get_joint_probability(x, z, phonemes, params):
@@ -177,50 +170,50 @@ def get_joint_probability(x, z, phonemes, params):
     This could be implemented more efficiently, but it doesn't run very often.
     """
     total_n = 0
-    counts_tensor = torch.Tensor(phonemes['cat_counts'])
+    counts_tensor = np.array(phonemes['cat_counts'])
 
     # Compute p(z|alpha)
     # Compute numerator
-    logprob = (phonemes['max_cat'].item() + 1) * log(params['alpha'])
-    logprob += torch.sum(torch.lgamma(counts_tensor))
-    total_n += torch.sum(counts_tensor)
+    logprob = (phonemes['max_cat'] + 1) * np.log(params['alpha'])
+    logprob += np.sum(gammaln(counts_tensor))
+    total_n += np.sum(counts_tensor)
 
     # Compute denominator
-    logprob -= sum([log(i + params['alpha']) for i in range(int(total_n.item()))])
+    logprob -= sum([np.log(i + params['alpha']) for i in range(total_n)])
 
     # Compute p(w|z,mu_0,nu_0,S_0)
     # Reset category means, vars, and nus
-    phonemes['cat_mus'] = [params['mu_0'].clone() for _ in range(phonemes['max_cat'] + 1)] 
-    phonemes['cat_covs'] = [params['S_0'].clone() for _ in range(phonemes['max_cat'] + 1)] 
+    phonemes['cat_mus'] = [params['mu_0'].copy() for _ in range(phonemes['max_cat'] + 1)] 
+    phonemes['cat_covs'] = [params['S_0'].copy() for _ in range(phonemes['max_cat'] + 1)] 
     phonemes['cat_nus'] = [params['nu_0']] * (phonemes['max_cat'] + 1)
 
-    cat_mu_sums = torch.stack([torch.sum(x[z==k], 0) for k in range(phonemes['max_cat'] + 1)])
+    cat_mu_sums = np.stack([np.sum(x[z==k], 0) for k in range(phonemes['max_cat'] + 1)])
 
     cat_cov_sums = []
     for k in range(phonemes['max_cat'] + 1):
         cat_tokens = x[z==k]
-        cat_cov_sum = torch.sum(
-            torch.stack([
-                token.view(-1, 1) @ token.view(1, -1)
+        cat_cov_sum = np.sum(
+            np.stack([
+                token.reshape(-1, 1) @ token.reshape(1, -1)
                 for token in cat_tokens
             ]), 
             0
         )
         cat_cov_sums.append(cat_cov_sum)
-    cat_cov_sums = torch.stack(cat_cov_sums)
+    cat_cov_sums = np.stack(cat_cov_sums)
 
-    n = torch.Tensor(phonemes['cat_counts'])
+    n = np.array(phonemes['cat_counts'])
 
     # Correct mean and sum-of-squares terms
     # Normalize mean, E[X]
-    cat_mu_sums = cat_mu_sums.div(n[:, None])
+    cat_mu_sums = np.divide(cat_mu_sums, n[:, None])
     # n * E[X^2] - n * E[X]^2
     cat_cov_sums += -n[:, None, None] * cat_mu_sums[:, None, :] * cat_mu_sums[:, :, None]
 
     logprob += sum([
         get_likelihood(
             cat_mu_sums, k, phonemes, params, 
-            data_ss= torch.stack([cat_cov_sums[k]] * (phonemes['max_cat'] + 2)), 
+            data_ss= np.stack([cat_cov_sums[k]] * (phonemes['max_cat'] + 2)), 
             n=n[k])[k] 
         for k in range(phonemes['max_cat'] + 1)
     ])
@@ -232,7 +225,7 @@ def get_joint_probability(x, z, phonemes, params):
 
 def get_annealing_factor(iteration, params):
     if params['annealing_factor']:
-        anneal = min(1, log(2 + iteration) / params['annealing_factor'])
+        anneal = min(1, np.log(2 + iteration) / params['annealing_factor'])
     else:
         anneal = 0
 
@@ -247,7 +240,7 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
     ##################
 
     print("Initializing parameters")
-    z = torch.zeros([x.shape[0]]) - 1
+    z = np.zeros([x.shape[0]]) - 1
     anneal = get_annealing_factor(0, params)
     log_likelihoods = []
 
@@ -260,8 +253,7 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
     }
 
     # Initialize a few cached values
-    params['dims_tensor'] = torch.arange(x.shape[1])[:, None]
-
+    params['dims_tensor'] = np.arange(x.shape[1])[:, None]
     # First pass to initialize token categories
 
     for token_idx in range(len(z)):
@@ -289,10 +281,10 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
 
 def run(vowel_samples, params):
     # Set parameters for prior distributions based on dimensionality
-    params['mu_0'] = torch.Tensor([
+    params['mu_0'] = np.array([
         params['prior_means'][dim] for dim in params['dimensions']
     ])
-    params['S_0'] = torch.eye(len(params['dimensions']))
+    params['S_0'] = np.eye(len(params['dimensions']))
     params['nu_0'] = len(params['dimensions']) - 1 + 0.001
 
     # Do Gibbs sampling
