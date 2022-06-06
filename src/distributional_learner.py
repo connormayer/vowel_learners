@@ -47,10 +47,10 @@ def add_values(x, token_idx, cat, phonemes, params, data_ss=0, n=1):
     mu = mu * (nu / (nu + n))
     scaled_x = x[token_idx] * (n / (nu + n))
     mu += scaled_x
-    phonemes['cat_nus'][cat] += n
 
-    # Force matrix to be symmetrical
-    cov = make_symmetric(cov)
+    phonemes['cat_mus'][cat] = mu
+    phonemes['cat_covs'][cat] = make_symmetric(cov)
+    phonemes['cat_nus'][cat] += n
 
 def subtract_values(x, token_idx, cat, phonemes, data_ss=0, n=1):
     """
@@ -71,8 +71,8 @@ def subtract_values(x, token_idx, cat, phonemes, data_ss=0, n=1):
     cov -= data_ss
     cov -= (nu * n) / (nu + n) * mu_diff * mu_diff[:, None]
 
-    # Force matrix to be symmetrical
-    cov = make_symmetric(cov)
+    phonemes['cat_mus'][cat] = mu
+    phonemes['cat_covs'][cat] = make_symmetric(cov)
 
 def make_symmetric(mat):
     return np.maximum(mat, mat.transpose())
