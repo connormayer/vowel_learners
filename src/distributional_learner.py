@@ -144,14 +144,13 @@ def get_likelihood(x, token_idx, phonemes, params, data_ss=0, n=1):
     S_c = covs + data_ss
     mu_diff = x[token_idx] - mus
     S_c += (n * nus[:, None, None]) / (n + nus[:, None, None]) * mu_diff[:, None, :] * mu_diff[:, :, None]
-    p = 0
 
     nus_tensor = np.tile(nus, (dims, 1))
     t1 = (nus_tensor - params['dims_tensor'])
     t2 = t1 / 2
     t1 = (n + t1) / 2
 
-    p += sum(gammaln(t1) - gammaln(t2))
+    p = sum(gammaln(t1) - gammaln(t2))
     p += (nus / 2) * np.linalg.slogdet(covs)[1]
     p -= (dims * n / 2) * np.log(np.pi)
     p -= (dims / 2) * np.log((nus + n) / nus)
