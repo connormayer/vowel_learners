@@ -282,8 +282,8 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
 def run(vowel_samples, params):
     # Set parameters for prior distributions based on dimensionality
     params['mu_0'] = np.array([
-        params['prior_means'][dim] for dim in params['dimensions']
-    ])
+        params['prior_means'][dim] for dim in params['dimensions']], 
+        dtype='float')
     params['S_0'] = np.eye(len(params['dimensions']))
     params['nu_0'] = len(params['dimensions']) - 1 + 0.001
 

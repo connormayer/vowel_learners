@@ -14,6 +14,8 @@ def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples):
     counts = pd.read_csv(counts_file)
 
     mu_names = ['vowel'] + dimensions
+    assert all(item in mus.columns for item in mu_names), \
+        "You specified an invalid dimension name"
     mus = mus.filter(mu_names)
 
     cov_names = ['vowel'] + [
@@ -137,17 +139,17 @@ if __name__ == "__main__":
         }
     else:
         params['prior_means'] = {
-            'f1': 500,
-            'f2': 1500,
-            'duration': 275,
-            'df1_on': 0,
-            'df2_on': 0,
-            'df1_off': 0,
-            'df2_off': 0,
-            'f3': 2500,
-            'df3_on': 0,
-            'df3_off': 0,
-            'f4': 4000
+            'f1': 500.,
+            'f2': 1500.,
+            'duration': 275.,
+            'df1_on': 0.,
+            'df2_on': 0.,
+            'df1_off': 0.,
+            'df2_off': 0.,
+            'f3': 2500.,
+            'df3_on': 0.,
+            'df3_off': 0.,
+            'f4': 4000.
         }
 
     file_bits = path.split(args.mu_file)[1].split('_')
