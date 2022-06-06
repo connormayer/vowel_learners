@@ -26,10 +26,11 @@ def create_phoneme(phonemes, params):
     of the categories in four separate lists rather than having a single object
     per category because this format simplifies the vector calculations.
     """
-    phonemes['cat_mus'].append(params['mu_0'].copy())
-    phonemes['cat_covs'].append(params['S_0'].copy())
-    phonemes['cat_nus'].append(params['nu_0'])
-    phonemes['cat_counts'].append(0)
+    phonemes['cat_mus'] = np.vstack((phonemes['cat_mus'], params['mu_0']))
+    phonemes['cat_covs'] = np.vstack((phonemes['cat_covs'], [params['S_0']]))
+    phonemes['cat_nus'] = np.append(phonemes['cat_nus'], params['nu_0'])
+    phonemes['cat_counts'][-1] = 0
+    phonemes['cat_counts'] = np.append(phonemes['cat_counts'], params['alpha'])
 
 def add_values(x, token_idx, cat, phonemes, params, data_ss=0, n=1):
     """
@@ -120,10 +121,10 @@ def remove_token(z, x, token_idx, phonemes):
         # Decrement all category labels above prev_cat
         z[z > prev_cat] -= 1
         # Delete phoneme from our phoneme lists
-        phonemes['cat_mus'].pop(prev_cat)
-        phonemes['cat_covs'].pop(prev_cat)
-        phonemes['cat_nus'].pop(prev_cat)
-        phonemes['cat_counts'].pop(prev_cat)
+        phonemes['cat_mus'] = np.delete(phonemes['cat_mus'], prev_cat, 0)
+        phonemes['cat_covs'] = np.delete(phonemes['cat_covs'], prev_cat, 0)
+        phonemes['cat_nus'] = np.delete(phonemes['cat_nus'], prev_cat)
+        phonemes['cat_counts'] = np.delete(phonemes['cat_counts'], prev_cat)
         phonemes['max_cat'] -= 1
 
 def get_prior(phonemes, params):
@@ -131,8 +132,7 @@ def get_prior(phonemes, params):
     Calculates (something proportional to) the prior over existing categories
     and a new category
     """
-    pi = np.array(phonemes['cat_counts'] + [params['alpha']])
-    return np.log(pi)
+    return np.log(phonemes['cat_counts'])
 
 def get_likelihood(x, token_idx, phonemes, params, data_ss=0, n=1):
     """
@@ -140,14 +140,13 @@ def get_likelihood(x, token_idx, phonemes, params, data_ss=0, n=1):
     or a new category given the existing category assignments
     """
     dims = x.shape[1]
-    mus = np.stack(phonemes['cat_mus'] + [params['mu_0']])
-    covs = np.stack(phonemes['cat_covs'] + [params['S_0']])
-    nus = np.array(phonemes['cat_nus'] + [params['nu_0']])
+    mus = phonemes['cat_mus']
+    covs = phonemes['cat_covs']
+    nus = phonemes['cat_nus']
 
     S_c = covs + data_ss
     mu_diff = x[token_idx] - mus
     S_c += (n * nus[:, None, None]) / (n + nus[:, None, None]) * mu_diff[:, None, :] * mu_diff[:, :, None]
-
     p = 0
 
     nus_tensor = np.tile(nus, (dims, 1))
@@ -245,10 +244,10 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
     log_likelihoods = []
 
     phonemes = {
-        'cat_mus': [],
-        'cat_covs': [],
-        'cat_nus': [],
-        'cat_counts': [],
+        'cat_mus': params['mu_0'].reshape(-1, x.shape[1]),
+        'cat_covs': params['S_0'].reshape(-1, x.shape[1], x.shape[1]),
+        'cat_nus': np.array([params['nu_0']]),
+        'cat_counts': np.array([params['alpha']]),
         'max_cat': -1
     }
 
@@ -268,9 +267,9 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
         resample_z(z, x, anneal, phonemes, params)
 
         if b % print_every == 0:
-            ll = get_joint_probability(x, z, phonemes, params)
-            log_likelihoods.append((b, ll.item()))
-            print("Log likelihood: {}".format(ll))
+            #ll = get_joint_probability(x, z, phonemes, params)
+            #log_likelihoods.append((b, ll.item()))
+            #print("Log likelihood: {}".format(ll))
             print("Num cats: {}".format(phonemes['max_cat'] + 1))
 
     return z, phonemes, log_likelihoods
