@@ -36,7 +36,7 @@ def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples):
 
     samples = []
     labels = []
-    import pdb; pdb.set_trace()
+
     freq_dist = torch.distributions.Categorical(torch.Tensor(counts.n.to_numpy()))
 
     for i in range(num_samples):
