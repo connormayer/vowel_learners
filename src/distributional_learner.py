@@ -6,6 +6,7 @@ from scipy.special import gammaln, logsumexp
 import random
 random.seed(0)
 np.random.seed(0)
+torch.manual_seed(0)
 
 #################
 # SAMPLING CODE #
