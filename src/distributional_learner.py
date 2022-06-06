@@ -1,13 +1,8 @@
 import numpy as np
-import torch
-
 from scipy.special import gammaln, logsumexp
 
 # For debugging
-import random
-random.seed(0)
-np.random.seed(0)
-torch.manual_seed(0)
+# np.random.seed(0)
 
 #################
 # SAMPLING CODE #
@@ -171,7 +166,7 @@ def get_joint_probability(x, z, phonemes, params):
     This could be implemented more efficiently, but it doesn't run very often.
     """
     total_n = 0
-    counts_tensor = np.array(phonemes['cat_counts'])
+    counts_tensor = np.array(phonemes['cat_counts'][:-1])
 
     # Compute p(z|alpha)
     # Compute numerator
@@ -184,9 +179,9 @@ def get_joint_probability(x, z, phonemes, params):
 
     # Compute p(w|z,mu_0,nu_0,S_0)
     # Reset category means, vars, and nus
-    phonemes['cat_mus'] = [params['mu_0'].copy() for _ in range(phonemes['max_cat'] + 1)] 
-    phonemes['cat_covs'] = [params['S_0'].copy() for _ in range(phonemes['max_cat'] + 1)] 
-    phonemes['cat_nus'] = [params['nu_0']] * (phonemes['max_cat'] + 1)
+    phonemes['cat_mus'] = np.array([params['mu_0'].copy() for _ in range(phonemes['max_cat'] + 2)])
+    phonemes['cat_covs'] = np.array([params['S_0'].copy() for _ in range(phonemes['max_cat'] + 2)])
+    phonemes['cat_nus'] = np.array([params['nu_0']] * (phonemes['max_cat'] + 2))
 
     cat_mu_sums = np.stack([np.sum(x[z==k], 0) for k in range(phonemes['max_cat'] + 1)])
 
@@ -203,7 +198,7 @@ def get_joint_probability(x, z, phonemes, params):
         cat_cov_sums.append(cat_cov_sum)
     cat_cov_sums = np.stack(cat_cov_sums)
 
-    n = np.array(phonemes['cat_counts'])
+    n = np.array(phonemes['cat_counts'][:-1])
 
     # Correct mean and sum-of-squares terms
     # Normalize mean, E[X]
@@ -257,6 +252,7 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
     params['dims_tensor'] = np.arange(x.shape[1])[:, None]
     # First pass to initialize token categories
 
+
     for token_idx in range(len(z)):
         add_token(z, x, token_idx, anneal, phonemes, params)
 
@@ -269,10 +265,15 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
         resample_z(z, x, anneal, phonemes, params)
 
         if b % print_every == 0:
-            #ll = get_joint_probability(x, z, phonemes, params)
-            #log_likelihoods.append((b, ll.item()))
-            #print("Log likelihood: {}".format(ll))
+            ll = get_joint_probability(x, z, phonemes, params)
+            log_likelihoods.append((b, ll.item()))
+            print("Log likelihood: {}".format(ll))
             print("Num cats: {}".format(phonemes['max_cat'] + 1))
+
+    phonemes['cat_mus'] = phonemes['cat_mus'][:-1]
+    phonemes['cat_covs'] = phonemes['cat_covs'][:-1]
+    phonemes['cat_nus'] = phonemes['cat_nus'][:-1]
+    phonemes['cat_counts'] = phonemes['cat_counts'][:-1]
 
     return z, phonemes, log_likelihoods
 

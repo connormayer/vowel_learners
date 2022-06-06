@@ -2,15 +2,11 @@ from distributional_learner import run
 from os import path
 
 import argparse
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import torch
 
-import random
-random.seed(0)
-np.random.seed(0)
-torch.manual_seed(0)
+# For debugging
+# np.random.seed(0)
 
 def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples):
     mus = pd.read_csv(mu_file)
@@ -36,10 +32,10 @@ def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples):
 
     samples = []
     labels = []
-    freq_dist = torch.distributions.Categorical(torch.Tensor(counts.n.to_numpy()))
+    p = counts.n.to_numpy() / sum(counts.n.to_numpy())
 
     for i in range(num_samples):
-        cat = freq_dist.sample()
+        cat = np.random.choice(len(counts), p=p)
         mu, cov = dists[int(cat)]
         val = np.random.multivariate_normal(mu, cov)
         samples.append(val)
@@ -168,45 +164,45 @@ if __name__ == "__main__":
 
     learned_z, cats, lls = run(samples, params)
 
-    # output = pd.DataFrame(samples)
-    # output.columns = params['dimensions']
+    output = pd.DataFrame(samples)
+    output.columns = params['dimensions']
 
-    # output['vowel'] = labels
-    # output['learned_cat'] = learned_z
-    # output.to_csv(
-    #     path.join(
-    #         args.output_folder, 
-    #         '{}_{}_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.suffix)
-    #     ),
-    #     index=False
-    # )
+    output['vowel'] = labels
+    output['learned_cat'] = learned_z
+    output.to_csv(
+        path.join(
+            args.output_folder, 
+            '{}_{}_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.suffix)
+        ),
+        index=False
+    )
 
-    # cat_mus = pd.DataFrame(np.stack(cats['cat_mus']))
-    # cat_mus['vowel'] = cat_mus.index
-    # cat_mus.columns = params['dimensions'] + ['vowel']
-    # cat_mus.to_csv(
-    #     path.join(
-    #         args.output_folder, 
-    #         '{}_{}_mus_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.suffix)
-    #     ),
-    #     index=False
-    # )
+    cat_mus = pd.DataFrame(np.stack(cats['cat_mus']))
+    cat_mus['vowel'] = cat_mus.index
+    cat_mus.columns = params['dimensions'] + ['vowel']
+    cat_mus.to_csv(
+        path.join(
+            args.output_folder, 
+            '{}_{}_mus_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.suffix)
+        ),
+        index=False
+    )
 
-    # cat_covs = np.stack(cats['cat_covs'])
-    # cat_covs = pd.DataFrame(cat_covs.reshape(cat_covs.shape[0], -1))
-    # cat_covs['vowel'] = cat_covs.index
-    # cov_colnames = [
-    #     '-'.join([dim1, dim2]) for dim1 in params['dimensions'] 
-    #     for dim2 in params['dimensions']
-    # ] + ['vowel']
-    # cat_covs.columns = cov_colnames
-    # cat_covs.to_csv(
-    #     path.join(
-    #         args.output_folder, 
-    #         '{}_{}_covs_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.suffix)
-    #     ), 
-    #     index=False
-    # )
+    cat_covs = np.stack(cats['cat_covs'])
+    cat_covs = pd.DataFrame(cat_covs.reshape(cat_covs.shape[0], -1))
+    cat_covs['vowel'] = cat_covs.index
+    cov_colnames = [
+        '-'.join([dim1, dim2]) for dim1 in params['dimensions'] 
+        for dim2 in params['dimensions']
+    ] + ['vowel']
+    cat_covs.columns = cov_colnames
+    cat_covs.to_csv(
+        path.join(
+            args.output_folder, 
+            '{}_{}_covs_{}_{}.csv'.format(language, register, '_'.join(params['dimensions']), args.suffix)
+        ), 
+        index=False
+    )
 
     # lls = pd.DataFrame(lls)
     # lls.columns = ['iteration', 'log_likelihood']
