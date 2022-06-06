@@ -2,15 +2,11 @@ from distributional_learner import run
 from os import path
 
 import argparse
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import torch
 
-import random
-random.seed(0)
-np.random.seed(0)
-torch.manual_seed(0)
+# For debugging
+# np.random.seed(0)
 
 def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples):
     mus = pd.read_csv(mu_file)
@@ -18,6 +14,10 @@ def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples):
     counts = pd.read_csv(counts_file)
 
     mu_names = ['vowel'] + dimensions
+
+    assert all(item in mus.columns for item in mu_names), \
+        "You specified an invalid dimension name"
+
     mus = mus.filter(mu_names)
 
     cov_names = ['vowel'] + [
@@ -37,10 +37,10 @@ def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples):
     samples = []
     labels = []
 
-    freq_dist = torch.distributions.Categorical(torch.Tensor(counts.n.to_numpy()))
+    p = counts.n.to_numpy() / sum(counts.n.to_numpy())
 
     for i in range(num_samples):
-        cat = freq_dist.sample()
+        cat = np.random.choice(len(counts), p=p)
         mu, cov = dists[int(cat)]
         val = np.random.multivariate_normal(mu, cov)
         samples.append(val)
@@ -142,17 +142,17 @@ if __name__ == "__main__":
         }
     else:
         params['prior_means'] = {
-            'f1': 500,
-            'f2': 1500,
-            'duration': 275,
-            'df1_on': 0,
-            'df2_on': 0,
-            'df1_off': 0,
-            'df2_off': 0,
-            'f3': 2500,
-            'df3_on': 0,
-            'df3_off': 0,
-            'f4': 4000
+            'f1': 500.,
+            'f2': 1500.,
+            'duration': 275.,
+            'df1_on': 0.,
+            'df2_on': 0.,
+            'df1_off': 0.,
+            'df2_off': 0.,
+            'f3': 2500.,
+            'df3_on': 0.,
+            'df3_off': 0.,
+            'f4': 4000.
         }
 
     file_bits = path.split(args.mu_file)[1].split('_')
@@ -167,7 +167,7 @@ if __name__ == "__main__":
         num_samples=args.vowel_samples
     )
 
-    learned_z, cats, lls = run(torch.Tensor(samples), params)
+    learned_z, cats, lls = run(samples, params)
 
     output = pd.DataFrame(samples)
     output.columns = params['dimensions']
