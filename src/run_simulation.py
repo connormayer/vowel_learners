@@ -2,10 +2,11 @@ from distributional_learner import run
 from os import path
 
 import argparse
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import torch
+
+# For debugging
+# np.random.seed(0)
 
 def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples):
     mus = pd.read_csv(mu_file)
@@ -24,24 +25,23 @@ def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples):
     dists = []
 
     for v in mus.vowel:
-        dists.append(
-            torch.distributions.MultivariateNormal(
-                torch.Tensor(mus[mus.vowel == v].iloc[:, 1:].to_numpy()),
-                torch.Tensor(covs[covs.vowel == v].iloc[:, 1:].to_numpy()).view(len(dimensions), -1)
-            )
-        )
+        mu = mus[mus.vowel == v].iloc[:, 1:].to_numpy()[0]
+        cov = covs[covs.vowel == v].iloc[:, 1:].to_numpy()[0]
+        cov = cov.reshape(len(dimensions), -1)
+        dists.append([mu, cov])
 
     samples = []
     labels = []
-    freq_dist = torch.distributions.Categorical(torch.Tensor(counts.n.to_numpy()))
+    p = counts.n.to_numpy() / sum(counts.n.to_numpy())
 
     for i in range(num_samples):
-        cat = freq_dist.sample()
-        val = dists[int(cat)].sample()
-        samples.append(val[0])
+        cat = np.random.choice(len(counts), p=p)
+        mu, cov = dists[int(cat)]
+        val = np.random.multivariate_normal(mu, cov)
+        samples.append(val)
         labels.append(counts.vowel[int(cat)])
 
-    samples = torch.stack(samples)
+    samples = np.stack(samples)
 
     return samples, labels
 
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     output.columns = params['dimensions']
 
     output['vowel'] = labels
-    output['learned_cat'] = learned_z.int()
+    output['learned_cat'] = learned_z
     output.to_csv(
         path.join(
             args.output_folder, 
@@ -177,7 +177,7 @@ if __name__ == "__main__":
         index=False
     )
 
-    cat_mus = pd.DataFrame(torch.stack(cats['cat_mus']))
+    cat_mus = pd.DataFrame(np.stack(cats['cat_mus']))
     cat_mus['vowel'] = cat_mus.index
     cat_mus.columns = params['dimensions'] + ['vowel']
     cat_mus.to_csv(
@@ -188,7 +188,7 @@ if __name__ == "__main__":
         index=False
     )
 
-    cat_covs = torch.stack(cats['cat_covs'])
+    cat_covs = np.stack(cats['cat_covs'])
     cat_covs = pd.DataFrame(cat_covs.reshape(cat_covs.shape[0], -1))
     cat_covs['vowel'] = cat_covs.index
     cov_colnames = [
