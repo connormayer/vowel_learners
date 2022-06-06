@@ -250,21 +250,20 @@ def gibbs_sample(x, params, num_samples=10000, print_every=10000):
 
     # Initialize a few cached values
     params['dims_tensor'] = np.arange(x.shape[1])[:, None]
+
     # First pass to initialize token categories
-
-
     for token_idx in range(len(z)):
         add_token(z, x, token_idx, anneal, phonemes, params)
 
     print("Beginning sampling...")
 
     for b in range(num_samples):
-        print("Iteration {}".format(b))
         anneal = get_annealing_factor(b, params)
 
         resample_z(z, x, anneal, phonemes, params)
 
         if b % print_every == 0:
+            print("Iteration {}".format(b))
             ll = get_joint_probability(x, z, phonemes, params)
             log_likelihoods.append((b, ll.item()))
             print("Log likelihood: {}".format(ll))
