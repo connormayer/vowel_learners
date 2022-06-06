@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 from scipy.special import gammaln, logsumexp
 
@@ -6,6 +7,7 @@ from scipy.special import gammaln, logsumexp
 import random
 random.seed(0)
 np.random.seed(0)
+torch.manual_seed(0)
 
 #################
 # SAMPLING CODE #

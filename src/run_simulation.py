@@ -7,6 +7,11 @@ import numpy as np
 import pandas as pd
 import torch
 
+import random
+random.seed(0)
+np.random.seed(0)
+torch.manual_seed(0)
+
 def sample_inputs(mu_file, cov_file, counts_file, dimensions, num_samples):
     mus = pd.read_csv(mu_file)
     covs = pd.read_csv(cov_file)
